@@ -59,6 +59,15 @@ func clampOrigin(_ origin: NSPoint, size: NSSize, to frame: NSRect) -> NSPoint {
     y: min(max(origin.y, frame.minY), max(frame.minY, frame.maxY - size.height)))
 }
 final class App: NSObject, NSApplicationDelegate {
+  enum BubbleState { case idle, scanning, ready, cleaning, done }
+  var bubbleState: BubbleState = .idle
+  let bubble = NSPopover()
+  let bubbleTitle = NSTextField(labelWithString: "Let's make room.")
+  let bubbleMessage = NSTextField(wrappingLabelWithString: "Click your companion to scan.")
+  let bubbleClean = NSButton(title: "Clean", target: nil, action: nil)
+  let bubbleLater = NSButton(title: "Later", target: nil, action: nil)
+  let bubbleDetails = NSButton(title: "Details", target: nil, action: nil)
+  let spinner = NSProgressIndicator()
   var buddy: FloatingPanel!, panel: FloatingPanel!, statusItem: NSStatusItem!
   let avatar = AvatarView(frame: NSRect(x: 0, y: 0, width: 104, height: 120))
   let capacity = NSTextField(labelWithString: "Let's make room.")
@@ -99,6 +108,7 @@ final class App: NSObject, NSApplicationDelegate {
     buddy.hasShadow = false
     buddy.contentView = avatar
     makeCleaner()
+    makeBubble()
     for w in [buddy!, panel!] {
       w.level = .floating
       w.hidesOnDeactivate = false
@@ -108,14 +118,18 @@ final class App: NSObject, NSApplicationDelegate {
     avatar.setAccessibilityElement(true)
     avatar.setAccessibilityRole(.button)
     avatar.setAccessibilityLabel(
-      "Cache-Chan avatar. Click to open cleaner. Drag to move. Right-click for settings.")
-    avatar.toolTip = "Click to clean · drag to move · right-click to customize"
-    avatar.onClick = { [weak self] in self?.toggleCleaner() }
+      "Cache-Chan avatar. Click to scan caches. Drag to move. Right-click for settings.")
+    avatar.toolTip = "Click to scan · drag to move · right-click to customize"
+    avatar.onClick = { [weak self] in self?.scanFromAvatar() }
     avatar.onMove = { [weak self] in
       guard let s = self else { return }
       s.keepOnScreen()
       s.defaults.set(NSStringFromPoint(s.buddy.frame.origin), forKey: "companionPosition")
       s.positionCleaner()
+      if s.bubble.isShown {
+        s.bubble.close()
+        s.showBubble()
+      }
     }
     avatar.contextMenu = menu()
     if let image = NSImage(contentsOf: avatarURL) { avatar.image = image }
@@ -134,11 +148,80 @@ final class App: NSObject, NSApplicationDelegate {
       CommandLine.arguments.count > i + 1
     {
       capacity.stringValue = "Your space. Reclaimed."
+      updateBubble(
+        .done, title: "Scan. Review. Clean.",
+        message:
+          "Click my avatar to scan your development caches. I'll ask before deleting anything.")
       subtitle.stringValue = "Scan, review, confirm. You're in control."
       detail.string =
         "A desktop companion with a smaller footprint.\n\n13 fixed cache locations\nCustom avatars · Drag anywhere\nNo admin access · No telemetry\n\nClick Scan to see your real cache sizes."
       exportPreview(to: CommandLine.arguments[i + 1])
       NSApp.terminate(nil)
+    }
+  }
+  func makeBubble() {
+    let controller = NSViewController()
+    controller.view = NSView(frame: NSRect(x: 0, y: 0, width: 292, height: 190))
+    bubbleTitle.font = .systemFont(ofSize: 19, weight: .bold)
+    bubbleMessage.font = .systemFont(ofSize: 12)
+    bubbleMessage.textColor = .secondaryLabelColor
+    bubbleClean.target = self
+    bubbleClean.action = #selector(clean)
+    bubbleLater.target = self
+    bubbleLater.action = #selector(dismissBubble)
+    bubbleDetails.target = self
+    bubbleDetails.action = #selector(openCleaner)
+    for button in [bubbleClean, bubbleLater, bubbleDetails] { button.bezelStyle = .rounded }
+    bubbleClean.contentTintColor = rose
+    spinner.style = .spinning
+    spinner.controlSize = .small
+    spinner.isDisplayedWhenStopped = false
+    let header = NSStackView(views: [spinner, bubbleTitle])
+    header.spacing = 8
+    let actions = NSStackView(views: [bubbleClean, bubbleLater, bubbleDetails])
+    actions.spacing = 8
+    let stack = NSStackView(views: [header, bubbleMessage, actions])
+    stack.orientation = .vertical
+    stack.alignment = .leading
+    stack.spacing = 14
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    controller.view.addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.leadingAnchor.constraint(equalTo: controller.view.leadingAnchor, constant: 18),
+      stack.trailingAnchor.constraint(equalTo: controller.view.trailingAnchor, constant: -18),
+      stack.topAnchor.constraint(equalTo: controller.view.topAnchor, constant: 18),
+      bubbleMessage.widthAnchor.constraint(equalTo: stack.widthAnchor),
+    ])
+    bubble.contentViewController = controller
+    bubble.contentSize = controller.view.frame.size
+    bubble.behavior = .applicationDefined
+    bubble.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    updateBubble(.idle, title: "Let's make room.", message: "Click your companion to scan.")
+  }
+  func showBubble() {
+    if !bubble.isShown {
+      bubble.show(
+        relativeTo: NSRect(x: 8, y: 25, width: 88, height: 88), of: avatar, preferredEdge: .minX)
+    }
+  }
+  func scanFromAvatar() {
+    show()
+    showBubble()
+    if !busy { scan() }
+  }
+  @objc func dismissBubble() { bubble.close() }
+  func updateBubble(_ state: BubbleState, title: String, message: String) {
+    bubbleState = state
+    bubbleTitle.stringValue = title
+    bubbleMessage.stringValue = message
+    bubbleClean.isHidden = state != .ready
+    bubbleClean.isEnabled = state == .ready && measured.contains { $0.1 > 0 }
+    bubbleLater.title = (state == .ready) ? "Later" : "Close"
+    bubbleDetails.isEnabled = state != .cleaning
+    if state == .scanning || state == .cleaning {
+      spinner.startAnimation(nil)
+    } else {
+      spinner.stopAnimation(nil)
     }
   }
   func makeCleaner() {
@@ -196,7 +279,7 @@ final class App: NSObject, NSApplicationDelegate {
     let custom = NSButton(title: "Change avatar…", target: self, action: #selector(changeAvatar))
     custom.bezelStyle = .rounded
     custom.contentTintColor = rose
-    let footer = NSTextField(labelWithString: "© 2026 guoxianzhe · MIT License · v0.2.0")
+    let footer = NSTextField(labelWithString: "© 2026 guoxianzhe · MIT License · v0.3.0")
     footer.font = .systemFont(ofSize: 10)
     footer.textColor = NSColor(calibratedWhite: 0.65, alpha: 1)
     let note = NSTextField(
@@ -242,6 +325,7 @@ final class App: NSObject, NSApplicationDelegate {
   }
   @objc func show() { buddy.orderFrontRegardless() }
   @objc func openCleaner() {
+    bubble.close()
     show()
     positionCleaner()
     panel.makeKeyAndOrderFront(nil)
@@ -296,7 +380,7 @@ final class App: NSObject, NSApplicationDelegate {
   }
   @objc func about() {
     let a = NSAlert()
-    a.messageText = "Cache-Chan 0.2.0"
+    a.messageText = "Cache-Chan 0.3.0"
     a.icon = mascotImage()
     a.informativeText =
       "A little companion. A little more space.\n\nCopyright © 2026 guoxianzhe\nCode and original mascot: MIT License\n\ngithub.com/guoxianzhe/cache-cleaner\nNo telemetry. No automatic cleaning."
@@ -304,12 +388,16 @@ final class App: NSObject, NSApplicationDelegate {
   }
   func setBusy(_ value: Bool) {
     busy = value
+    avatar.setActivity(value)
     scanButton.isEnabled = !value
     cleanButton.isEnabled = !value && measured.contains { $0.1 > 0 }
   }
   @objc func scan() {
     guard !busy else { return }
     setBusy(true)
+    updateBubble(
+      .scanning, title: "Checking your caches…",
+      message: "Scanning 13 cache locations. Nothing is being deleted.")
     capacity.stringValue = "Checking your caches…"
     subtitle.stringValue = "Scanning 13 locations. No files are being removed."
     DispatchQueue.global(qos: .utility).async {
@@ -332,6 +420,12 @@ final class App: NSObject, NSApplicationDelegate {
           "Disk available: \(human(freeSpace())) · Review before cleaning."
         self.detail.string = text
         self.setBusy(false)
+        self.updateBubble(
+          total > 0 ? .ready : .done,
+          title: total > 0 ? "Clean \(human(total))?" : "All clear!",
+          message: total > 0
+            ? "Permanently delete these development caches? Quit active builds first. Details shows the exact paths."
+            : "No eligible caches to clean. Click the avatar whenever you want to scan again.")
       }
     }
   }
@@ -339,14 +433,20 @@ final class App: NSObject, NSApplicationDelegate {
     guard !busy else { return }
     let selected = measured.filter { $0.1 > 0 }
     guard !selected.isEmpty else { return }
-    let a = NSAlert()
-    a.messageText = "Clean \(human(selected.reduce(0) { $0+$1.1 })) of caches?"
-    a.informativeText =
-      "Only the listed development caches will be permanently deleted. Quit active builds first. Your source code, chats and Git worktrees are outside the cleaning scope."
-    a.addButton(withTitle: "Clean caches")
-    a.addButton(withTitle: "Cancel")
-    guard a.runModal() == .alertFirstButtonReturn else { return }
+    // The bubble's explicit Clean button is the confirmation; no second modal.
+    guard bubble.isShown && bubbleState == .ready else {
+      showBubble()
+      updateBubble(
+        .ready, title: "Clean \(human(selected.reduce(0) { $0+$1.1 }))?",
+        message:
+          "Permanently delete these development caches? Quit active builds first. Details shows the exact paths."
+      )
+      return
+    }
     setBusy(true)
+    updateBubble(
+      .cleaning, title: "Making room…",
+      message: "Removing only the scanned cache locations. Keep Cache-Chan running.")
     capacity.stringValue = "Making room…"
     subtitle.stringValue = "Keep Cache-Chan open until cleaning finishes."
     DispatchQueue.global(qos: .utility).async {
@@ -371,6 +471,12 @@ final class App: NSObject, NSApplicationDelegate {
         self.capacity.stringValue = "\(human(deleted)) cleared"
         self.subtitle.stringValue =
           failures.isEmpty ? "A little more breathing room." : "Some locations need attention."
+        self.updateBubble(
+          .done, title: "\(human(deleted)) cleared",
+          message: failures.isEmpty
+            ? "Disk available: \(human(afterFree)). Your caches will rebuild when needed."
+            : "Some locations could not be cleaned. Open Details for the errors.")
+        self.avatar.celebrate()
         self.detail.string =
           "Disk available: \(human(afterFree))\nAvailable space change: \(human(afterFree-beforeFree))\n\n"
           + (failures.isEmpty
@@ -380,7 +486,12 @@ final class App: NSObject, NSApplicationDelegate {
     }
   }
   func exportPreview(to path: String) {
-    panel.contentView!.layoutSubtreeIfNeeded()
+    let previewView = bubble.contentViewController!.view
+    previewView.wantsLayer = true
+    previewView.layer?.backgroundColor =
+      NSColor(calibratedRed: 0.10, green: 0.09, blue: 0.13, alpha: 1).cgColor
+    previewView.layer?.cornerRadius = 16
+    previewView.layoutSubtreeIfNeeded()
     let image = NSImage(size: NSSize(width: 1000, height: 640))
     image.lockFocus()
     NSColor(calibratedRed: 0.97, green: 0.92, blue: 0.93, alpha: 1).setFill()
@@ -399,13 +510,13 @@ final class App: NSObject, NSApplicationDelegate {
       withAttributes: [
         .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold), .foregroundColor: ink,
       ])
-    if let bitmap = panel.contentView!.bitmapImageRepForCachingDisplay(
-      in: panel.contentView!.bounds)
+    if let bitmap = previewView.bitmapImageRepForCachingDisplay(
+      in: previewView.bounds)
     {
-      panel.contentView!.cacheDisplay(in: panel.contentView!.bounds, to: bitmap)
-      let ui = NSImage(size: panel.contentView!.bounds.size)
+      previewView.cacheDisplay(in: previewView.bounds, to: bitmap)
+      let ui = NSImage(size: previewView.bounds.size)
       ui.addRepresentation(bitmap)
-      ui.draw(in: NSRect(x: 532, y: 64, width: 410, height: 510))
+      ui.draw(in: NSRect(x: 532, y: 245, width: 365, height: 237.5))
     }
     image.unlockFocus()
     try? pngData(image)?.write(to: URL(fileURLWithPath: path))
@@ -427,6 +538,22 @@ final class App: NSObject, NSApplicationDelegate {
       assert(human(1_073_741_824) == "1.00 GiB")
       assert(human(-1_073_741_824) == "-1.00 GiB")
       assert(NSImage(data: pngData(mascotImage())!) != nil)
+      let animationView = AvatarView(frame: NSRect(x: 0, y: 0, width: 104, height: 120))
+      animationView.setActivity(true)
+      if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        assert(animationView.layer?.animation(forKey: "activity") != nil)
+      }
+      animationView.setActivity(false)
+      assert(animationView.layer?.animation(forKey: "activity") == nil)
+      let controller = App()
+      controller.makeBubble()
+      controller.updateBubble(.ready, title: "Test", message: "No caches")
+      assert(!controller.bubbleClean.isEnabled)
+      controller.measured = [(file, 8192)]
+      controller.updateBubble(.ready, title: "Test", message: "Has caches")
+      assert(controller.bubbleClean.isEnabled && !controller.bubbleClean.isHidden)
+      controller.updateBubble(.cleaning, title: "Test", message: "Working")
+      assert(!controller.bubbleClean.isEnabled && controller.bubbleClean.isHidden)
       let screen = NSRect(x: 0, y: 0, width: 1000, height: 800)
       assert(
         clampOrigin(NSPoint(x: -20, y: 900), size: NSSize(width: 104, height: 120), to: screen)
