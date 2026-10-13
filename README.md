@@ -13,19 +13,20 @@
   <img src="https://img.shields.io/badge/runtime_dependencies-zero-24212c?style=flat-square" alt="Zero third-party runtime dependencies">
 </p>
 
-![Cache-Chan project showcase: the original mascot beside the real native cleaner panel](docs/showcase.png)
+![Cache-Chan project showcase: the original mascot beside the real native speech bubble](docs/showcase.png)
 
 ## Meet your new desktop buddy
 
-Leave Cache-Chan on your desktop, drag her wherever you like, and click her avatar when you want to make room. Pick your own character image to make the companion yours.
+Leave Cache-Chan on your desktop and click her avatar to scan immediately. A small speech bubble asks whether to clean; click **Clean** to confirm, or **Later** to leave everything untouched. Pick your own character image to make the companion yours.
 
-- **Avatar first.** A small floating companion, with the cleaner tucked away until you need it.
+- **Avatar first.** Click once to scan, then answer a compact speech bubble. Details stays out of the way until you need it.
+- **A little motion.** A gentle pulse while working, an animated bubble and a happy hop on completion. Respects macOS Reduce Motion.
 - **Your character, your desk.** Choose a local image, center-crop it into a round avatar and keep it across restarts.
 - **Know before you clean.** Scan fixed development cache locations and review their measured sizes before confirming.
 - **See the result.** The cleaner reports removed cache size, remaining space and the actual available-space change.
 - **Native and local.** Swift + AppKit. No account, administrator access, telemetry, network calls or automatic cleaning.
 
-The showcase uses the actual native view in a presentation state. Cache sizes are measured from your machine when you scan; no reclaimed-space claim is fabricated.
+The showcase uses the actual native bubble view in a presentation state. Cache sizes are measured from your machine when you scan; no reclaimed-space claim is fabricated.
 
 ## Run it
 
@@ -43,12 +44,14 @@ The build creates `build/Cache-Chan.app`, runs an isolated self-test and applies
 
 | Action | What happens |
 | --- | --- |
-| Click avatar | Open or hide the cleaner; first opening scans caches |
+| Click avatar | Scan every time and show a speech bubble; while busy, show the current progress |
 | Drag avatar | Move it; placement is saved and clamped to a visible screen |
 | Right-click avatar | Change/reset avatar, open cleaner, About or Quit |
 | Menu bar sparkle | The same controls, even if the cleaner is closed |
 | Scan again | Refresh the per-directory estimate without deleting anything |
-| Clean caches… | Review the confirmation, then remove only measured cache targets |
+| Clean in bubble | Confirm permanent deletion of the scanned cache targets, with no second modal |
+| Later / Close | Dismiss the bubble without starting cleanup; an ongoing cleanup continues |
+| Details | Open the per-directory breakdown and result/error report |
 
 Your image is copied as a cropped PNG to `~/Library/Application Support/Cache-Chan/avatar.png`. The original stays untouched. The default mascot can be restored with **Reset avatar**. Custom images are never uploaded; their rights remain with their respective owners.
 
@@ -79,7 +82,7 @@ bash build.sh
 build/Cache-Chan.app/Contents/MacOS/CacheCleaner --self-test
 ```
 
-The self-test covers path boundaries, symbolic-link rejection, capacity formatting, mascot PNG rendering and deletion in a disposable test directory. It never deletes real development caches. Also test clicking, dragging, avatar selection and the confirmation's **Cancel** path after UI changes.
+The self-test covers path boundaries, symbolic-link rejection, capacity formatting, mascot PNG rendering, animation teardown and deletion in a disposable test directory. It never deletes real development caches. Also test clicking, dragging, avatar selection and the bubble's **Later** path after UI changes.
 
 To regenerate the repository artwork:
 
