@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Clicking the avatar always starts a fresh scan and shows a compact speech bubble.
+- Confirm cleanup directly with Clean, or dismiss with Later; no second modal.
+- Add working pulse, animated popover and completion hop with Reduce Motion support.
+- Keep the full directory breakdown and error report accessible through Details.
+
 ## 0.2.0
 
 - Introduce the Cache-Chan identity and original chibi mascot.
