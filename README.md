@@ -1,38 +1,96 @@
-# 缓存小扫帚
+<p align="center">
+  <img src="docs/mascot.png" width="100" alt="Cache-Chan, an original pink-haired chibi desktop companion">
+</p>
 
-原生 macOS 悬浮窗开发缓存清理工具，使用 Swift + AppKit，无第三方依赖。
+<h1 align="center">Cache-Chan</h1>
+<p align="center"><strong>A little companion. A little more space.</strong></p>
+<p align="center">An anime-inspired macOS desktop buddy that helps you reclaim development cache space.</p>
 
-## 构建和运行
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-f4a7b7?style=flat-square" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/platform-macOS_11%2B-24212c?style=flat-square" alt="macOS 11 and newer">
+  <img src="https://img.shields.io/badge/built_with-Swift_%2B_AppKit-f4a7b7?style=flat-square" alt="Swift and AppKit">
+  <img src="https://img.shields.io/badge/runtime_dependencies-zero-24212c?style=flat-square" alt="Zero third-party runtime dependencies">
+</p>
 
-需要 macOS 11 或更新版本，以及 Xcode 或 Xcode Command Line Tools。
+![Cache-Chan project showcase: the original mascot beside the real native cleaner panel](docs/showcase.png)
+
+## Meet your new desktop buddy
+
+Leave Cache-Chan on your desktop, drag her wherever you like, and click her avatar when you want to make room. Pick your own character image to make the companion yours.
+
+- **Avatar first.** A small floating companion, with the cleaner tucked away until you need it.
+- **Your character, your desk.** Choose a local image, center-crop it into a round avatar and keep it across restarts.
+- **Know before you clean.** Scan fixed development cache locations and review their measured sizes before confirming.
+- **See the result.** The cleaner reports removed cache size, remaining space and the actual available-space change.
+- **Native and local.** Swift + AppKit. No account, administrator access, telemetry, network calls or automatic cleaning.
+
+The showcase uses the actual native view in a presentation state. Cache sizes are measured from your machine when you scan; no reclaimed-space claim is fabricated.
+
+## Run it
+
+Requires macOS 11 or newer and Xcode or Xcode Command Line Tools with a Swift compiler that supports `@main`.
 
 ```sh
+git clone https://github.com/guoxianzhe/cache-cleaner.git
+cd cache-cleaner
 bash build.sh --run
 ```
 
-构建脚本先编译，再运行隔离的临时目录自检，最后对应用进行本地 ad-hoc 签名。输出位于 `build/缓存小扫帚.app`，可在 Finder 中双击，或复制到“应用程序”。这不是 Developer ID 签名或公证发行版。
+The build creates `build/Cache-Chan.app`, runs an isolated self-test and applies an ad-hoc local signature. Double-click the app later or copy it into Applications. This is a source-built app, not a Developer ID signed or notarized download.
 
-## 使用
+## The tiny controls
 
-启动后自动扫描固定范围。点击“清理…”并确认后才删除缓存。完成后显示清理量、剩余容量和磁盘可用空间变化。关闭悬浮窗后，点击菜单栏 ✨ →“显示悬浮窗”重新打开；从同一菜单退出应用。
+| Action | What happens |
+| --- | --- |
+| Click avatar | Open or hide the cleaner; first opening scans caches |
+| Drag avatar | Move it; placement is saved and clamped to a visible screen |
+| Right-click avatar | Change/reset avatar, open cleaner, About or Quit |
+| Menu bar sparkle | The same controls, even if the cleaner is closed |
+| Scan again | Refresh the per-directory estimate without deleting anything |
+| Clean caches… | Review the confirmation, then remove only measured cache targets |
 
-扫描与清理在后台执行，操作期间按钮禁用。建议先退出相关开发工具及正在运行的构建。
+Your image is copied as a cropped PNG to `~/Library/Application Support/Cache-Chan/avatar.png`. The original stays untouched. The default mascot can be restored with **Reset avatar**. Custom images are never uploaded; their rights remain with their respective owners.
 
-## 清理范围
+## What's on the menu?
 
-仅清理当前用户下的以下固定目录；不使用管理员权限，不访问云端：
+Only these fixed paths under the current user's home are eligible:
 
-- `Library/Application Support/Codex/Crashpad/pending`
-- `.cache/uv`
-- `Library/Caches/vscode-cpptools`
-- `.gradle/caches`、`.gradle/.tmp`、`.gradle/daemon`
-- `.npm/_cacache`、`.npm/_npx`
-- `Library/Caches/CocoaPods`、`Yarn`、`electron`、`ms-playwright`、`typescript`
+| Tool | Cache paths |
+| --- | --- |
+| Codex | `Library/Application Support/Codex/Crashpad/pending` |
+| uv | `.cache/uv` |
+| VS Code C++ | `Library/Caches/vscode-cpptools` |
+| Gradle | `.gradle/caches`, `.gradle/.tmp`, `.gradle/daemon` |
+| npm / npx | `.npm/_cacache`, `.npm/_npx` |
+| CocoaPods / Yarn | `Library/Caches/CocoaPods`, `Library/Caches/Yarn` |
+| Electron / Playwright / TypeScript | `Library/Caches/electron`, `Library/Caches/ms-playwright`, `Library/Caches/typescript` |
 
-缓存永久删除，不进入废纸篓；之后使用工具时可能需要重新下载、索引或编译。源码、Git 工作树、聊天数据、Codex 对话和 Docker 数据不在范围内。
+**Deletion is permanent, not a move to Trash.** Quit active builds and affected tools first. Packages, browsers and indexes may need to download or rebuild afterwards. Source code, Git worktrees, chat files, Codex conversations and Docker data are outside this scope.
 
-扫描前拒绝目标或父路径中的符号链接。无权限读取的目录会显示错误并跳过；部分清理失败会报告。容量由 `du -sk` 统计，受 APFS 共享块和其他应用活动影响，不等于磁盘最终释放量。不要在清理期间更改目标目录或链接。
+Symbolic links in a target or its parent path are rejected before measurement and again before cleanup. Inaccessible locations are reported and skipped. Do not replace target paths while cleaning: this small utility does not lock the filesystem against concurrent directory changes.
 
-## 自检
+Disk estimates use `du -sk`. APFS shared blocks and other apps' activity mean removed cache size and available disk space can differ. Scanning/cleanup runs in the background and disables action buttons until completion.
 
-`bash build.sh` 自动验证路径约束、符号链接拒绝、容量格式和临时测试目录删除，不删除真实缓存。界面取消流程也可通过“清理…”→“取消”验证。
+## Build, check, hack
+
+```sh
+bash build.sh
+build/Cache-Chan.app/Contents/MacOS/CacheCleaner --self-test
+```
+
+The self-test covers path boundaries, symbolic-link rejection, capacity formatting, mascot PNG rendering and deletion in a disposable test directory. It never deletes real development caches. Also test clicking, dragging, avatar selection and the confirmation's **Cancel** path after UI changes.
+
+To regenerate the repository artwork:
+
+```sh
+mkdir -p docs
+build/Cache-Chan.app/Contents/MacOS/CacheCleaner --export-avatar docs/mascot.png
+build/Cache-Chan.app/Contents/MacOS/CacheCleaner --preview docs/showcase.png
+```
+
+Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Have an idea for a companion or a new cache target? [Open an issue](https://github.com/guoxianzhe/cache-cleaner/issues). If Cache-Chan makes your desk a little happier, a star helps others find her.
+
+## License
+
+Copyright © 2026 [guoxianzhe](https://github.com/guoxianzhe). Code and the original default mascot are released under the [MIT License](LICENSE). No third-party anime characters are bundled. See [CHANGELOG.md](CHANGELOG.md) for release notes.
