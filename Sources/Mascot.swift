@@ -1,5 +1,6 @@
 // Copyright (c) 2026 guoxianzhe. SPDX-License-Identifier: MIT
 import Cocoa
+import QuartzCore
 
 let ink = NSColor(calibratedRed: 0.18, green: 0.15, blue: 0.24, alpha: 1)
 let rose = NSColor(calibratedRed: 1, green: 0.67, blue: 0.74, alpha: 1)
@@ -103,6 +104,25 @@ func pngData(_ image: NSImage) -> Data? {
   return bitmap.representation(using: .png, properties: [:])
 }
 final class AvatarView: NSView {
+  func setActivity(_ active: Bool) {
+    wantsLayer = true
+    layer?.removeAnimation(forKey: "activity")
+    guard active, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+    let pulse = CABasicAnimation(keyPath: "opacity")
+    pulse.fromValue = 1
+    pulse.toValue = 0.55
+    pulse.duration = 0.65
+    pulse.autoreverses = true
+    pulse.repeatCount = .infinity
+    layer?.add(pulse, forKey: "activity")
+  }
+  func celebrate() {
+    guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+    let hop = CAKeyframeAnimation(keyPath: "transform.translation.y")
+    hop.values = [0, 7, -3, 2, 0]
+    hop.duration = 0.55
+    layer?.add(hop, forKey: "celebrate")
+  }
   var image = mascotImage()
   var onClick: (() -> Void)?, onMove: (() -> Void)?
   var contextMenu: NSMenu?
