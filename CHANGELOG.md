@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Add idle breathing, left/right glances, waving and a playful tilt.
+- Animate the broom and arm with cached multi-frame character poses.
+- Add a two-hop happy dance with smile, waving and sparkle particles.
+- Wave on hover and add Wave hello / Happy dance menu actions.
+- Respect Reduce Motion and reuse rendered frames instead of regenerating artwork per tick.
+
 ## 0.4.0
 
 - Replace the circular desktop portrait with an original full-body transparent chibi and broom.
