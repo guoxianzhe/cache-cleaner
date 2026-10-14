@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/mascot.png" width="100" alt="Cache-Chan, an original pink-haired chibi desktop companion">
+  <img src="docs/mascot.png" width="100" alt="Cache-Chan, an original full-body pink-haired chibi with a broom">
 </p>
 
 <h1 align="center">Cache-Chan</h1>
@@ -19,9 +19,9 @@
 
 Leave Cache-Chan on your desktop and click her avatar to scan immediately. A small speech bubble asks whether to clean; click **Clean** to confirm, or **Later** to leave everything untouched. Pick your own character image to make the companion yours.
 
-- **Avatar first.** Click once to scan, then answer a compact speech bubble. Details stays out of the way until you need it.
-- **A little motion.** A gentle pulse while working, an animated bubble and a happy hop on completion. Respects macOS Reduce Motion.
-- **Your character, your desk.** Choose a local image, center-crop it into a round avatar and keep it across restarts.
+- **A full-body friend.** A transparent chibi character with a broom, from hair bow to boots. Click once to scan, then answer a compact speech bubble.
+- **A little personality.** The original character blinks while idle, waves while working, then smiles and hops on completion. Respects macOS Reduce Motion.
+- **Your character, your desk.** Choose a local image and show it in full, with its aspect ratio and transparency preserved. No circular crop.
 - **Know before you clean.** Scan fixed development cache locations and review their measured sizes before confirming.
 - **See the result.** The cleaner reports removed cache size, remaining space and the actual available-space change.
 - **Native and local.** Swift + AppKit. No account, administrator access, telemetry, network calls or automatic cleaning.
@@ -53,7 +53,9 @@ The build creates `build/Cache-Chan.app`, runs an isolated self-test and applies
 | Later / Close | Dismiss the bubble without starting cleanup; an ongoing cleanup continues |
 | Details | Open the per-directory breakdown and result/error report |
 
-Your image is copied as a cropped PNG to `~/Library/Application Support/Cache-Chan/avatar.png`. The original stays untouched. The default mascot can be restored with **Reset avatar**. Custom images are never uploaded; their rights remain with their respective owners.
+Your image is copied as a proportionally resized PNG to `~/Library/Application Support/Cache-Chan/companion.png`. The original stays untouched. Transparent PNGs work best for a full-body companion. The default mascot can be restored with **Reset avatar**. Custom images are never uploaded; their rights remain with their respective owners. Blinking and hand-pose changes are exclusive to the original vector character; custom images are static artwork with the working sway and completion hop.
+
+Version 0.4 uses a new full-image preference. Older circular avatar copies are kept untouched; select the original image again to use it without cropping.
 
 ## What's on the menu?
 
