@@ -20,13 +20,17 @@
 Leave Cache-Chan on your desktop and click her avatar to scan immediately. A small speech bubble asks whether to clean; click **Clean** to confirm, or **Later** to leave everything untouched. Pick your own character image to make the companion yours.
 
 - **A full-body friend.** A transparent chibi character with a broom, from hair bow to boots. Click once to scan, then answer a compact speech bubble.
-- **A little personality.** The original character blinks while idle, waves while working, then smiles and hops on completion. Respects macOS Reduce Motion.
+- **A little personality.** Breathing, blinking, glancing, waving and tilting while idle. A moving broom while working. A two-hop happy dance with sparkles when done. Respects macOS Reduce Motion.
 - **Your character, your desk.** Choose a local image and show it in full, with its aspect ratio and transparency preserved. No circular crop.
 - **Know before you clean.** Scan fixed development cache locations and review their measured sizes before confirming.
 - **See the result.** The cleaner reports removed cache size, remaining space and the actual available-space change.
 - **Native and local.** Swift + AppKit. No account, administrator access, telemetry, network calls or automatic cleaning.
 
 The showcase uses the actual native bubble view in a presentation state. Cache sizes are measured from your machine when you scan; no reclaimed-space claim is fabricated.
+
+<p align="center"><img src="docs/motion.gif" height="240" alt="Cache-Chan's cached arm and broom animation frames"></p>
+
+Hover to say hello, or use **Wave hello** / **Happy dance** in the right-click menu to preview actions. Default character frames are cached once. The animation clock checks state at 12 Hz; idle artwork redraws only when the pose or blink changes, while breathing uses Core Animation.
 
 ## Run it
 
@@ -92,6 +96,7 @@ To regenerate the repository artwork:
 mkdir -p docs
 build/Cache-Chan.app/Contents/MacOS/CacheCleaner --export-avatar docs/mascot.png
 build/Cache-Chan.app/Contents/MacOS/CacheCleaner --preview docs/showcase.png
+build/Cache-Chan.app/Contents/MacOS/CacheCleaner --export-motion docs/motion.gif
 ```
 
 Contributions welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Have an idea for a companion or a new cache target? [Open an issue](https://github.com/guoxianzhe/cache-cleaner/issues). If Cache-Chan makes your desk a little happier, a star helps others find her.
