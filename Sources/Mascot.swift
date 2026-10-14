@@ -99,12 +99,14 @@ func portraitImage(_ dimension: CGFloat = 512) -> NSImage {
 }
 // Full-body companion. The portrait remains the square application icon.
 func mascotImage(
-  _ height: CGFloat = 512, blink: Bool = false, working: Bool = false, happy: Bool = false
+  _ height: CGFloat = 512, blink: Bool = false, working: Bool = false, happy: Bool = false,
+  gaze: CGFloat = 0, swing: CGFloat = 0
 ) -> NSImage {
-  let image = NSImage(size: NSSize(width: height * 2 / 3, height: height))
+  let image = NSImage(size: NSSize(width: height * 110 / 150, height: height))
   image.lockFocus()
   let transform = NSAffineTransform()
   transform.scale(by: height / 150)
+  transform.translateX(by: 7, yBy: 0)
   transform.concat()
   let skin = NSColor(calibratedRed: 1, green: 0.89, blue: 0.82, alpha: 1)
   let hair = NSColor(calibratedRed: 0.94, green: 0.54, blue: 0.65, alpha: 1)
@@ -140,7 +142,16 @@ func mascotImage(
     p.stroke()
   }
   oval(NSRect(x: 27, y: 6, width: 57, height: 8), ink.withAlphaComponent(0.12))
-  // Broom, with a wooden handle and rose bristle tie.
+  func rotateLimb(_ pivot: NSPoint, degrees: CGFloat) {
+    let t = NSAffineTransform()
+    t.translateX(by: pivot.x, yBy: pivot.y)
+    t.rotate(byDegrees: degrees)
+    t.translateX(by: -pivot.x, yBy: -pivot.y)
+    t.concat()
+  }
+  NSGraphicsContext.saveGraphicsState()
+  rotateLimb(NSPoint(x: 43, y: 85), degrees: swing * 8)
+  // The broom and gripping hand share a shoulder pivot.
   line(
     [NSPoint(x: 13, y: 24), NSPoint(x: 24, y: 104)],
     NSColor(calibratedRed: 0.62, green: 0.39, blue: 0.27, alpha: 1), width: 3)
@@ -150,6 +161,7 @@ func mascotImage(
   line([NSPoint(x: 12, y: 28), NSPoint(x: 9, y: 15)], ink.withAlphaComponent(0.4), width: 0.7)
   line([NSPoint(x: 16, y: 28), NSPoint(x: 18, y: 14)], ink.withAlphaComponent(0.4), width: 0.7)
   line([NSPoint(x: 8, y: 29), NSPoint(x: 22, y: 28)], hair, width: 3)
+  NSGraphicsContext.restoreGraphicsState()
   // Twin tails sit behind the shoulders, rather than inside a portrait badge.
   oval(NSRect(x: 19, y: 76, width: 24, height: 59), hair, outline: true)
   oval(NSRect(x: 71, y: 76, width: 23, height: 59), hair, outline: true)
@@ -170,13 +182,18 @@ func mascotImage(
   line([NSPoint(x: 41, y: 19), NSPoint(x: 48, y: 19)], rose, width: 2)
   line([NSPoint(x: 63, y: 19), NSPoint(x: 69, y: 19)], rose, width: 2)
   oval(NSRect(x: 47, y: 87, width: 18, height: 13), skin, outline: true)
-  // Left hand holds the broom. Right hand changes pose while working.
+  // Left hand follows the broom; right hand waves independently.
+  NSGraphicsContext.saveGraphicsState()
+  rotateLimb(NSPoint(x: 43, y: 85), degrees: swing * 8)
   shape(
     [
       NSPoint(x: 43, y: 91), NSPoint(x: 35, y: 86), NSPoint(x: 24, y: 74), NSPoint(x: 29, y: 68),
       NSPoint(x: 45, y: 81),
     ], ink)
   oval(NSRect(x: 21, y: 67, width: 11, height: 11), skin, outline: true)
+  NSGraphicsContext.restoreGraphicsState()
+  NSGraphicsContext.saveGraphicsState()
+  rotateLimb(NSPoint(x: 73, y: 87), degrees: (working || happy) ? swing * 18 : 0)
   if working || happy {
     shape(
       [
@@ -193,6 +210,7 @@ func mascotImage(
       ], ink)
     oval(NSRect(x: 78, y: 57, width: 10, height: 12), skin, outline: true)
   }
+  NSGraphicsContext.restoreGraphicsState()
   shape(
     [NSPoint(x: 42, y: 94), NSPoint(x: 68, y: 94), NSPoint(x: 74, y: 64), NSPoint(x: 36, y: 64)],
     ink)
@@ -236,10 +254,10 @@ func mascotImage(
     } else {
       oval(NSRect(x: x - 1, y: 105, width: 10, height: 15), .white)
       oval(
-        NSRect(x: x, y: 105, width: 8, height: 14),
+        NSRect(x: x + gaze, y: 105, width: 8, height: 14),
         NSColor(calibratedRed: 0.24, green: 0.53, blue: 0.56, alpha: 1))
-      oval(NSRect(x: x + 2, y: 107, width: 4, height: 10), ink)
-      oval(NSRect(x: x + 1, y: 114, width: 4, height: 4), .white)
+      oval(NSRect(x: x + 2 + gaze, y: 107, width: 4, height: 10), ink)
+      oval(NSRect(x: x + 1 + gaze, y: 114, width: 4, height: 4), .white)
       line(
         [NSPoint(x: x - 2, y: 119), NSPoint(x: x + 2, y: 121), NSPoint(x: x + 8, y: 119)], ink,
         width: 1.8)
@@ -277,33 +295,111 @@ func pngData(_ image: NSImage) -> Data? {
   }
   return bitmap.representation(using: .png, properties: [:])
 }
+enum CharacterAction { case idle, left, right, wave, tilt, sweep, happy }
+func idleAction(at seconds: TimeInterval) -> CharacterAction {
+  switch seconds.truncatingRemainder(dividingBy: 24) {
+  case 4..<7: return .left
+  case 7..<10: return .right
+  case 10..<14: return .wave
+  case 14..<18: return .tilt
+  default: return .idle
+  }
+}
 final class AvatarView: NSView {
   var usesDefault = true
-  private var active = false, blinking = false, cheering = false
-  private var blinkTimer: Timer?
+  private var active = false, blinking = false
+  private var animationTimer: Timer?
+  private let born = Date.timeIntervalSinceReferenceDate
+  private var waveUntil: TimeInterval = 0, workUntil: TimeInterval = 0, cheerUntil: TimeInterval = 0
+  private var action: CharacterAction = .idle, frameIndex = 0
+  private var lastFrame = ""
   private let idleImage = mascotImage()
   private let closedEyesImage = mascotImage(blink: true)
-  private let workingImage = mascotImage(working: true)
-  private let happyImage = mascotImage(happy: true)
+  private let leftImage = mascotImage(gaze: -1.5)
+  private let rightImage = mascotImage(gaze: 1.5)
+  private lazy var waveFrames = (0..<12).map {
+    mascotImage(256, working: true, swing: CGFloat(sin(Double($0) * .pi / 6)))
+  }
+  private lazy var sweepFrames = (0..<12).map {
+    mascotImage(256, swing: CGFloat(sin(Double($0) * .pi / 6)))
+  }
+  private lazy var happyFrames = (0..<12).map {
+    mascotImage(256, happy: true, swing: CGFloat(sin(Double($0) * .pi / 6)))
+  }
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
-    blinkTimer?.invalidate()
+    animationTimer?.invalidate()
     guard window != nil else { return }
-    blinkTimer = Timer.scheduledTimer(withTimeInterval: 4.8, repeats: true) { [weak self] _ in
-      guard let self = self, self.usesDefault, !self.active, !self.cheering,
-        !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-      else { return }
-      self.blinking = true
-      self.needsDisplay = true
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
-        self?.blinking = false
-        self?.needsDisplay = true
+    animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 12, repeats: true) {
+      [weak self] _ in self?.tick()
+    }
+    animationTimer?.tolerance = 0.025
+    tick()
+  }
+  deinit { animationTimer?.invalidate() }
+  private func tick() {
+    let now = Date.timeIntervalSinceReferenceDate
+    let elapsed = now - born
+    let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    let next: CharacterAction =
+      now < cheerUntil
+      ? .happy
+      : (active || now < workUntil)
+        ? .sweep : now < waveUntil ? .wave : reduced ? .idle : idleAction(at: elapsed)
+    let old = action
+    action = next
+    frameIndex = reduced ? 0 : Int(elapsed * 12) % 12
+    blinking = !reduced && elapsed.truncatingRemainder(dividingBy: 4.8) < 0.16
+    wantsLayer = true
+    if reduced {
+      layer?.removeAnimation(forKey: "breathing")
+      layer?.removeAnimation(forKey: "tilt")
+      layer?.removeAnimation(forKey: "activity")
+      layer?.removeAnimation(forKey: "celebrate")
+    } else {
+      if layer?.animation(forKey: "breathing") == nil {
+        let breath = CABasicAnimation(keyPath: "transform.scale.y")
+        breath.fromValue = 0.992
+        breath.toValue = 1.008
+        breath.duration = 1.8
+        breath.autoreverses = true
+        breath.repeatCount = .infinity
+        layer?.add(breath, forKey: "breathing")
+      }
+      if old != next {
+        layer?.removeAnimation(forKey: "tilt")
+        if next == .tilt {
+          let tilt = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+          tilt.values = [0, -0.08, 0.06, 0]
+          tilt.duration = 3.2
+          layer?.add(tilt, forKey: "tilt")
+        }
       }
     }
+    let moving = next == .wave || next == .sweep || next == .happy
+    let key = "\(next)-\(moving && usesDefault ? frameIndex : 0)-\(blinking)"
+    if key != lastFrame {
+      lastFrame = key
+      needsDisplay = true
+    }
   }
-  deinit { blinkTimer?.invalidate() }
+  func waveHello() {
+    waveUntil = Date.timeIntervalSinceReferenceDate + 2.6
+    tick()
+  }
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    trackingAreas.forEach { removeTrackingArea($0) }
+    addTrackingArea(
+      NSTrackingArea(
+        rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
+    )
+  }
+  override func mouseEntered(with event: NSEvent) { if !active { waveHello() } }
   func setActivity(_ active: Bool) {
     self.active = active
+    workUntil = Date.timeIntervalSinceReferenceDate + 0.65
+    tick()
     needsDisplay = true
     wantsLayer = true
     layer?.removeAnimation(forKey: "activity")
@@ -317,16 +413,12 @@ final class AvatarView: NSView {
     layer?.add(pulse, forKey: "activity")
   }
   func celebrate() {
-    cheering = true
-    needsDisplay = true
-    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-      self?.cheering = false
-      self?.needsDisplay = true
-    }
+    cheerUntil = Date.timeIntervalSinceReferenceDate + 2
+    tick()
     guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
     let hop = CAKeyframeAnimation(keyPath: "transform.translation.y")
-    hop.values = [0, 7, -3, 2, 0]
-    hop.duration = 0.55
+    hop.values = [0, 12, 0, 9, 0]
+    hop.duration = 0.9
     layer?.add(hop, forKey: "celebrate")
   }
   var image = mascotImage()
@@ -335,14 +427,37 @@ final class AvatarView: NSView {
   private var origin = NSPoint.zero, mouseOrigin = NSPoint.zero
   private var dragged = false
   override func draw(_ dirtyRect: NSRect) {
-    let artwork =
-      usesDefault
-      ? (cheering ? happyImage : active ? workingImage : blinking ? closedEyesImage : idleImage)
-      : image
+    var artwork = image
+    if usesDefault {
+      switch action {
+      case .wave: artwork = waveFrames[frameIndex]
+      case .sweep: artwork = sweepFrames[frameIndex]
+      case .happy: artwork = happyFrames[frameIndex]
+      case .left: artwork = blinking ? closedEyesImage : leftImage
+      case .right: artwork = blinking ? closedEyesImage : rightImage
+      default: artwork = blinking ? closedEyesImage : idleImage
+      }
+    }
     artwork.draw(
       in: fittedRect(
         artwork.size, in: NSRect(x: 8, y: 28, width: bounds.width - 16, height: bounds.height - 36)),
       from: .zero, operation: .sourceOver, fraction: 1)
+    if action == .happy && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+      let progress = min(1, max(0, (Date.timeIntervalSinceReferenceDate - cheerUntil + 2) / 2))
+      rose.withAlphaComponent(CGFloat(1 - progress)).setStroke()
+      for index in 0..<6 {
+        let angle = Double(index) * .pi / 3
+        let x = bounds.midX + CGFloat(cos(angle) * (30 + progress * 35))
+        let y = bounds.midY + 28 + CGFloat(sin(angle) * (30 + progress * 35))
+        let star = NSBezierPath()
+        star.lineWidth = 2
+        star.move(to: NSPoint(x: x - 3, y: y))
+        star.line(to: NSPoint(x: x + 3, y: y))
+        star.move(to: NSPoint(x: x, y: y - 3))
+        star.line(to: NSPoint(x: x, y: y + 3))
+        star.stroke()
+      }
+    }
     let attrs: [NSAttributedString.Key: Any] = [
       .font: NSFont.monospacedSystemFont(ofSize: 9, weight: .bold), .foregroundColor: ink,
     ]
