@@ -7,7 +7,7 @@ mkdir -p "$app/Contents/Resources" build/AppIcon.iconset
 cp Info.plist "$app/Contents/Info.plist"
 xcrun swiftc Sources/*.swift -target "$(uname -m)-apple-macos11.0" -o "$app/Contents/MacOS/CacheCleaner" -framework Cocoa
 "$app/Contents/MacOS/CacheCleaner" --self-test
-"$app/Contents/MacOS/CacheCleaner" --export-avatar build/avatar.png
+"$app/Contents/MacOS/CacheCleaner" --export-icon build/avatar.png
 for size in 16 32 128 256 512; do
   sips -z "$size" "$size" build/avatar.png --out "build/AppIcon.iconset/icon_${size}x${size}.png" >/dev/null
   double=$((size * 2))
