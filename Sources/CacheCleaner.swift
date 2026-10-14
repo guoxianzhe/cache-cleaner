@@ -1,5 +1,6 @@
 // Copyright (c) 2026 guoxianzhe. SPDX-License-Identifier: MIT
 import Cocoa
+import ImageIO
 import UniformTypeIdentifiers
 
 let paths = [
@@ -69,7 +70,7 @@ final class App: NSObject, NSApplicationDelegate {
   let bubbleDetails = NSButton(title: "Details", target: nil, action: nil)
   let spinner = NSProgressIndicator()
   var buddy: FloatingPanel!, panel: FloatingPanel!, statusItem: NSStatusItem!
-  let avatar = AvatarView(frame: NSRect(x: 0, y: 0, width: 152, height: 240))
+  let avatar = AvatarView(frame: NSRect(x: 0, y: 0, width: 168, height: 248))
   let capacity = NSTextField(labelWithString: "Let's make room.")
   let subtitle = NSTextField(labelWithString: "Click Scan to check your caches.")
   let detail = NSTextView()
@@ -84,6 +85,7 @@ final class App: NSObject, NSApplicationDelegate {
     let m = NSMenu()
     for (title, action) in [
       ("Show companion", #selector(show)), ("Open cleaner", #selector(openCleaner)),
+      ("Wave hello", #selector(waveHello)), ("Happy dance", #selector(happyDance)),
       ("Change avatar…", #selector(changeAvatar)), ("Reset avatar", #selector(resetAvatar)),
       ("About Cache-Chan", #selector(about)),
     ] {
@@ -204,7 +206,9 @@ final class App: NSObject, NSApplicationDelegate {
   func showBubble() {
     if !bubble.isShown {
       bubble.show(
-        relativeTo: NSRect(x: 8, y: 28, width: 136, height: 204), of: avatar, preferredEdge: .minX)
+        relativeTo: NSRect(
+          x: 8, y: 28, width: avatar.bounds.width - 16, height: avatar.bounds.height - 36),
+        of: avatar, preferredEdge: .minX)
     }
   }
   func scanFromAvatar() {
@@ -282,7 +286,7 @@ final class App: NSObject, NSApplicationDelegate {
     let custom = NSButton(title: "Change avatar…", target: self, action: #selector(changeAvatar))
     custom.bezelStyle = .rounded
     custom.contentTintColor = rose
-    let footer = NSTextField(labelWithString: "© 2026 guoxianzhe · MIT License · v0.4.0")
+    let footer = NSTextField(labelWithString: "© 2026 guoxianzhe · MIT License · v0.5.0")
     footer.font = .systemFont(ofSize: 10)
     footer.textColor = NSColor(calibratedWhite: 0.65, alpha: 1)
     let note = NSTextField(
@@ -327,6 +331,8 @@ final class App: NSObject, NSApplicationDelegate {
         NSPoint(x: x, y: buddy.frame.midY - panel.frame.height / 2), size: panel.frame.size, to: f))
   }
   @objc func show() { buddy.orderFrontRegardless() }
+  @objc func waveHello() { avatar.waveHello() }
+  @objc func happyDance() { avatar.celebrate() }
   @objc func openCleaner() {
     bubble.close()
     show()
@@ -384,7 +390,7 @@ final class App: NSObject, NSApplicationDelegate {
   }
   @objc func about() {
     let a = NSAlert()
-    a.messageText = "Cache-Chan 0.4.0"
+    a.messageText = "Cache-Chan 0.5.0"
     a.icon = mascotImage()
     a.informativeText =
       "A little companion. A little more space.\n\nCopyright © 2026 guoxianzhe\nCode and original mascot: MIT License\n\ngithub.com/guoxianzhe/cache-cleaner\nNo telemetry. No automatic cleaning."
@@ -549,6 +555,12 @@ final class App: NSObject, NSApplicationDelegate {
       assert(abs(fit.width / fit.height - pose.size.width / pose.size.height) < 0.001)
       assert(fit.width <= 136 && fit.height <= 204)
       assert(pngData(pose) != pngData(mascotImage(blink: true)))
+      assert(
+        pngData(mascotImage(256, working: true, swing: -1))
+          != pngData(mascotImage(256, working: true, swing: 1)))
+      assert(idleAction(at: 5) == .left && idleAction(at: 8) == .right)
+      assert(idleAction(at: 11) == .wave && idleAction(at: 15) == .tilt)
+      assert(idleAction(at: 25) == .idle)
       assert(NSBitmapImageRep(data: pngData(pose)!)!.colorAt(x: 0, y: 0)!.alphaComponent == 0)
       let animationView = AvatarView(frame: NSRect(x: 0, y: 0, width: 104, height: 120))
       animationView.setActivity(true)
@@ -580,6 +592,28 @@ final class App: NSObject, NSApplicationDelegate {
       print(
         "Self-test passed: scope validation, symlink rejection, signed capacity formatting, avatar rendering, temporary cleanup."
       )
+    } else if let i = CommandLine.arguments.firstIndex(of: "--export-motion"),
+      CommandLine.arguments.count > i + 1
+    {
+      let url = URL(fileURLWithPath: CommandLine.arguments[i + 1])
+      guard
+        let destination = CGImageDestinationCreateWithURL(
+          url as CFURL, UTType.gif.identifier as CFString, 36, nil)
+      else { throw NSError(domain: "Motion", code: 1) }
+      CGImageDestinationSetProperties(
+        destination,
+        [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+      for frame in 0..<36 {
+        let phase = CGFloat(sin(Double(frame % 12) * .pi / 6))
+        let pose = mascotImage(240, working: frame < 12, happy: frame >= 24, swing: phase)
+        let bitmap = NSBitmapImageRep(data: pngData(pose)!)!
+        CGImageDestinationAddImage(
+          destination, bitmap.cgImage!,
+          [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1.0 / 12]] as CFDictionary)
+      }
+      guard CGImageDestinationFinalize(destination) else {
+        throw NSError(domain: "Motion", code: 2)
+      }
     } else if let i = CommandLine.arguments.firstIndex(of: "--export-icon"),
       CommandLine.arguments.count > i + 1
     {
