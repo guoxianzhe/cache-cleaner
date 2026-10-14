@@ -69,7 +69,7 @@ final class App: NSObject, NSApplicationDelegate {
   let bubbleDetails = NSButton(title: "Details", target: nil, action: nil)
   let spinner = NSProgressIndicator()
   var buddy: FloatingPanel!, panel: FloatingPanel!, statusItem: NSStatusItem!
-  let avatar = AvatarView(frame: NSRect(x: 0, y: 0, width: 104, height: 120))
+  let avatar = AvatarView(frame: NSRect(x: 0, y: 0, width: 152, height: 240))
   let capacity = NSTextField(labelWithString: "Let's make room.")
   let subtitle = NSTextField(labelWithString: "Click Scan to check your caches.")
   let detail = NSTextView()
@@ -78,7 +78,7 @@ final class App: NSObject, NSApplicationDelegate {
   var measured: [(URL, Int64)] = [], busy = false
   let defaults = UserDefaults.standard
   var avatarURL: URL {
-    home.appendingPathComponent("Library/Application Support/Cache-Chan/avatar.png")
+    home.appendingPathComponent("Library/Application Support/Cache-Chan/companion.png")
   }
   func menu() -> NSMenu {
     let m = NSMenu()
@@ -132,11 +132,14 @@ final class App: NSObject, NSApplicationDelegate {
       }
     }
     avatar.contextMenu = menu()
-    if let image = NSImage(contentsOf: avatarURL) { avatar.image = image }
+    if let image = NSImage(contentsOf: avatarURL) {
+      avatar.image = image
+      avatar.usesDefault = false
+    }
     let frame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
     let position =
       defaults.string(forKey: "companionPosition").map(NSPointFromString)
-      ?? NSPoint(x: frame.maxX - 134, y: frame.minY + 120)
+      ?? NSPoint(x: frame.maxX - 182, y: frame.minY + 80)
     buddy.setFrameOrigin(position)
     keepOnScreen()
     statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -201,7 +204,7 @@ final class App: NSObject, NSApplicationDelegate {
   func showBubble() {
     if !bubble.isShown {
       bubble.show(
-        relativeTo: NSRect(x: 8, y: 25, width: 88, height: 88), of: avatar, preferredEdge: .minX)
+        relativeTo: NSRect(x: 8, y: 28, width: 136, height: 204), of: avatar, preferredEdge: .minX)
     }
   }
   func scanFromAvatar() {
@@ -279,7 +282,7 @@ final class App: NSObject, NSApplicationDelegate {
     let custom = NSButton(title: "Change avatar…", target: self, action: #selector(changeAvatar))
     custom.bezelStyle = .rounded
     custom.contentTintColor = rose
-    let footer = NSTextField(labelWithString: "© 2026 guoxianzhe · MIT License · v0.3.0")
+    let footer = NSTextField(labelWithString: "© 2026 guoxianzhe · MIT License · v0.4.0")
     footer.font = .systemFont(ofSize: 10)
     footer.textColor = NSColor(calibratedWhite: 0.65, alpha: 1)
     let note = NSTextField(
@@ -346,20 +349,20 @@ final class App: NSObject, NSApplicationDelegate {
           domain: "Avatar", code: 1,
           userInfo: [NSLocalizedDescriptionKey: "Please choose a readable image."])
       }
-      let normalized = NSImage(size: NSSize(width: 512, height: 512))
+      let scale = min(512 / max(image.size.width, image.size.height), 1)
+      let normalized = NSImage(
+        size: NSSize(width: image.size.width * scale, height: image.size.height * scale))
       normalized.lockFocus()
-      let side = min(image.size.width, image.size.height)
       image.draw(
-        in: NSRect(x: 0, y: 0, width: 512, height: 512),
-        from: NSRect(
-          x: (image.size.width - side) / 2, y: (image.size.height - side) / 2, width: side,
-          height: side), operation: .sourceOver, fraction: 1)
+        in: NSRect(origin: .zero, size: normalized.size),
+        from: .zero, operation: .sourceOver, fraction: 1)
       normalized.unlockFocus()
       guard let data = pngData(normalized) else { throw NSError(domain: "Avatar", code: 2) }
       try FileManager.default.createDirectory(
         at: avatarURL.deletingLastPathComponent(), withIntermediateDirectories: true)
       try data.write(to: avatarURL, options: .atomic)
       avatar.image = normalized
+      avatar.usesDefault = false
       avatar.needsDisplay = true
     } catch { errorAlert("Could not change avatar", error) }
   }
@@ -369,6 +372,7 @@ final class App: NSObject, NSApplicationDelegate {
         try FileManager.default.removeItem(at: avatarURL)
       }
       avatar.image = mascotImage()
+      avatar.usesDefault = true
       avatar.needsDisplay = true
     } catch { errorAlert("Could not reset avatar", error) }
   }
@@ -380,7 +384,7 @@ final class App: NSObject, NSApplicationDelegate {
   }
   @objc func about() {
     let a = NSAlert()
-    a.messageText = "Cache-Chan 0.3.0"
+    a.messageText = "Cache-Chan 0.4.0"
     a.icon = mascotImage()
     a.informativeText =
       "A little companion. A little more space.\n\nCopyright © 2026 guoxianzhe\nCode and original mascot: MIT License\n\ngithub.com/guoxianzhe/cache-cleaner\nNo telemetry. No automatic cleaning."
@@ -504,7 +508,9 @@ final class App: NSObject, NSApplicationDelegate {
       withAttributes: [
         .font: NSFont.systemFont(ofSize: 26, weight: .medium), .foregroundColor: ink,
       ])
-    mascotImage().draw(in: NSRect(x: 116, y: 144, width: 228, height: 228))
+    let character = mascotImage()
+    character.draw(
+      in: fittedRect(character.size, in: NSRect(x: 116, y: 114, width: 228, height: 310)))
     "NATIVE macOS  /  CUSTOM AVATARS  /  MIT".draw(
       at: NSPoint(x: 56, y: 58),
       withAttributes: [
@@ -538,6 +544,12 @@ final class App: NSObject, NSApplicationDelegate {
       assert(human(1_073_741_824) == "1.00 GiB")
       assert(human(-1_073_741_824) == "-1.00 GiB")
       assert(NSImage(data: pngData(mascotImage())!) != nil)
+      let pose = mascotImage()
+      let fit = fittedRect(pose.size, in: NSRect(x: 0, y: 0, width: 136, height: 204))
+      assert(abs(fit.width / fit.height - pose.size.width / pose.size.height) < 0.001)
+      assert(fit.width <= 136 && fit.height <= 204)
+      assert(pngData(pose) != pngData(mascotImage(blink: true)))
+      assert(NSBitmapImageRep(data: pngData(pose)!)!.colorAt(x: 0, y: 0)!.alphaComponent == 0)
       let animationView = AvatarView(frame: NSRect(x: 0, y: 0, width: 104, height: 120))
       animationView.setActivity(true)
       if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
@@ -568,6 +580,11 @@ final class App: NSObject, NSApplicationDelegate {
       print(
         "Self-test passed: scope validation, symlink rejection, signed capacity formatting, avatar rendering, temporary cleanup."
       )
+    } else if let i = CommandLine.arguments.firstIndex(of: "--export-icon"),
+      CommandLine.arguments.count > i + 1
+    {
+      try pngData(portraitImage(1024))!.write(
+        to: URL(fileURLWithPath: CommandLine.arguments[i + 1]))
     } else if let i = CommandLine.arguments.firstIndex(of: "--export-avatar"),
       CommandLine.arguments.count > i + 1
     {
