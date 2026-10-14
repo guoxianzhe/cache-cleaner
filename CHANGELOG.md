@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Replace the circular desktop portrait with an original full-body transparent chibi and broom.
+- Add idle blinking, working hand pose and smiling completion pose.
+- Display custom companion images in full with their aspect ratio and transparency preserved.
+- Resize the companion window and anchor the cleaning bubble to the whole character.
+- Retain the square portrait only for the application icon.
+
 ## 0.3.0
 
 - Clicking the avatar always starts a fresh scan and shows a compact speech bubble.
